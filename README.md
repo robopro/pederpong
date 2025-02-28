@@ -1,8 +1,12 @@
-# PederPong
+# PederPong2.0
 ## What if  Pong was bad?
 We have the answer to that question!  
   
-(The answer is PederPong)
+(The answer is PederPong2.0)
+
+Originally made for Extreme Pong Championship 2025 @ Gyldendal EdTech seminar.  
+
+Thanks to [sokkalf](https://github.com/sokkalf) and [anasmengh](https://github.com/anasmengh)!
 
 # Demo
 insert url
