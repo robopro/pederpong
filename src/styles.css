@@ -1,0 +1,27 @@
+body {
+  height: 100vh;
+  margin: 0;
+  font-family: monospace;
+  background: cyan;
+}
+h1 {
+  color: hotpink;
+  font-size: xxx-large;
+  margin-bottom: 0;
+}
+canvas {
+  background-color: black;
+  border: 5px solid hotpink;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.flex-row {
+  display: flex;
+  gap: 10px;
+}

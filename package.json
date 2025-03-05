@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "watch": "esbuild src/app.ts --outfile=src/app.js --bundle --watch",
+    "build": "esbuild src/app.ts --outfile=src/app.js --bundle"
+  },
   "devDependencies": {
+    "esbuild": "^0.25.0",
+    "prettier": "3.5.2",
     "typescript": "^5.7.3"
   }
 }

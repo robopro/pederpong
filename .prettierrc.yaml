@@ -1,0 +1,1 @@
+printWidth: 100 # <int> # Default 80 # Specify the line length that the printer will wrap on.
