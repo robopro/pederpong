@@ -4,10 +4,6 @@ export class LoadingDialog extends HTMLElement {
   constructor() {
     super();
 
-    // Binding methods
-    this.show = this.show.bind(this);
-    this.close = this.close.bind(this);
-
     // Build HTML
     const dialogElement = document.createElement("dialog");
     dialogElement.classList.add("loading-dialog");
@@ -67,13 +63,13 @@ export class LoadingDialog extends HTMLElement {
     shadow.appendChild(dialogElement);
   }
 
-  show() {
+  show = () => {
     this.#dialogElement.showModal();
-  }
+  };
 
-  close() {
+  close = () => {
     this.#dialogElement.close();
-  }
+  };
 }
 
 customElements.define("loading-dialog", LoadingDialog);

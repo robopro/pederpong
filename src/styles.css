@@ -12,6 +12,7 @@ h1 {
 canvas {
   background-color: black;
   border: 5px solid hotpink;
+  transition: transform 100ms;
 }
 
 .flex-column {

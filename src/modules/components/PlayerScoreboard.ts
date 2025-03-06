@@ -1,18 +1,28 @@
-import { swapColorAnimation, swapColorKeyframes } from "../variables";
+interface PlayerScoreboardData {
+  playerId: string;
+  name: string;
+  score: string;
+  color: string;
+}
 
-export class PlayerScore extends HTMLElement {
+export class PlayerScoreboard extends HTMLElement {
   #containerElement: HTMLDivElement;
   #nameElement: HTMLParagraphElement;
   #scoreElement: HTMLParagraphElement;
 
-  id: string = "";
-  name: string = "";
-  score: string = "";
-  color: string = "";
-  static observedAttributes = ["id", "name", "score", "color"];
+  playerid = "";
+  name = "";
+  score = "";
+  color = "";
+  static observedAttributes = ["playerid", "name", "score", "color"];
 
-  constructor() {
+  constructor({ playerId, name, score, color }: PlayerScoreboardData) {
     super();
+
+    this.playerid = playerId;
+    this.name = name;
+    this.score = score;
+    this.color = color;
 
     // Build HTML
     const containerElement = document.createElement("div");
@@ -26,7 +36,10 @@ export class PlayerScore extends HTMLElement {
           flex-direction: column;
           align-items: center;
           gap: 10px;
-          ${swapColorAnimation}
+          animation-name: color-swap;
+          animation-iteration-count: infinite;
+          animation-duration: 150ms;
+          animation-timing-function: ease-in;
 
           p {
             margin: 0;
@@ -36,7 +49,10 @@ export class PlayerScore extends HTMLElement {
           font-weight: bold;
         }
 
-        ${swapColorKeyframes}
+        @keyframes color-swap {
+          from { color: var(--player-color, black)};
+          to { color: transparent};
+        }
       </style>
     `;
 
@@ -59,8 +75,8 @@ export class PlayerScore extends HTMLElement {
   attributeChangedCallback(name: string, oldValue: string, newValue: string) {
     if (newValue !== oldValue) {
       switch (name) {
-        case "id":
-          this.id = newValue;
+        case "playerid":
+          this.playerid = newValue;
           break;
         case "name":
           this.name = newValue;
@@ -73,11 +89,28 @@ export class PlayerScore extends HTMLElement {
         case "color":
           this.color = newValue;
           this.#containerElement.style.setProperty("--player-color", newValue);
-        default:
           break;
       }
     }
   }
+
+  setPlayerScoreboardData = ({ playerId, name, score, color }: Partial<PlayerScoreboardData>) => {
+    if (playerId) {
+      this.playerid = playerId;
+    }
+    if (name) {
+      this.name = name;
+      this.#nameElement.innerHTML = name;
+    }
+    if (score) {
+      this.score = score;
+      this.#scoreElement.innerHTML = score;
+    }
+    if (color) {
+      this.color = color;
+      this.#containerElement.style.setProperty("--player-color", color);
+    }
+  };
 }
 
-customElements.define("player-score", PlayerScore);
+customElements.define("player-scoreboard", PlayerScoreboard);

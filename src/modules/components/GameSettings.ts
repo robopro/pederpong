@@ -1,30 +1,20 @@
 import { createCustomEvent, CustomEventType, isPlayerFormChangeEvent } from "../types";
-import { defaultPlayers } from "../variables";
 import { PlayerForm } from "./PlayerForm";
 
 export class GameSettings extends HTMLElement {
-  #formsContainerElement: HTMLDivElement;
-  #data: PlayerForm[] = [];
-  #select: HTMLSelectElement;
+  #playerFormsContainer: HTMLDivElement;
+  #playerForms: PlayerForm[] = [];
+  #playerCountInput: HTMLSelectElement;
 
   constructor() {
     super();
 
     // Initialize properties
-    this.#data = [];
-
-    // Binding methods
-    this.setPlayers = this.setPlayers.bind(this);
-    this.addPlayer = this.addPlayer.bind(this);
-    this.removePlayer = this.removePlayer.bind(this);
-    this.onPlayerFormChange = this.onPlayerFormChange.bind(this);
-
-    // Shadow DOM
-    const shadow = this.attachShadow({ mode: "open" });
+    this.#playerForms = [];
 
     // Build HTML
     const playerSettingsContainer = document.createElement("div");
-    shadow.appendChild(playerSettingsContainer);
+
     playerSettingsContainer.classList.add("player-settings");
     playerSettingsContainer.innerHTML = `
       <style>
@@ -42,6 +32,7 @@ export class GameSettings extends HTMLElement {
         <option value="2" selected>2</option>
         <option value="3">3</option>
         <option value="4">4</option>
+        <option value="5">5</option>
       </select>
       <div class="player-forms-container" style="
         display: flex;
@@ -49,13 +40,20 @@ export class GameSettings extends HTMLElement {
       "></div>
     `;
 
+    // Shadow DOM
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(playerSettingsContainer);
+
     // Initialize remaining properties
-    const select = this.shadowRoot?.querySelector(".player-count");
+    const playerCountInput = this.shadowRoot?.querySelector(".player-count");
     const playerFormsContainer = this.shadowRoot?.querySelector(".player-forms-container");
 
-    if (select instanceof HTMLSelectElement && playerFormsContainer instanceof HTMLDivElement) {
-      this.#select = select;
-      this.#formsContainerElement = playerFormsContainer;
+    if (
+      playerCountInput instanceof HTMLSelectElement &&
+      playerFormsContainer instanceof HTMLDivElement
+    ) {
+      this.#playerCountInput = playerCountInput;
+      this.#playerFormsContainer = playerFormsContainer;
     } else {
       throw new Error(
         "PlayerSettings ~ constructor: Couldn't find select element or forms container element",
@@ -63,33 +61,29 @@ export class GameSettings extends HTMLElement {
     }
 
     // Add default PlayerForm
-    this.addPlayer(2);
+    this.addPlayerForms(2);
   }
 
   connectedCallback() {
-    this.#select.addEventListener("change", this.setPlayers);
-
-    this.#data.forEach((playerForm) => {
-      playerForm.addEventListener("playerFormChange", (event) => this.onPlayerFormChange(event));
-    });
+    this.#playerCountInput.addEventListener("change", this.setPlayerForms);
   }
 
   disconnectedCallback() {
-    this.removePlayer(this.data.length);
-    this.#select.removeEventListener("change", this.setPlayers);
+    this.removePlayerForms(this.#playerForms.length);
+    this.#playerCountInput.removeEventListener("change", this.setPlayerForms);
   }
 
-  setPlayers(event: Event) {
+  private setPlayerForms = (event: Event) => {
     if (event.currentTarget instanceof HTMLSelectElement) {
       const newPlayerCount = parseInt(event.currentTarget.value);
 
       if (!isNaN(newPlayerCount)) {
-        const currentPlayerCount = this.data.length;
+        const currentPlayerCount = this.#playerForms.length;
 
         if (newPlayerCount > currentPlayerCount) {
-          this.addPlayer(newPlayerCount - currentPlayerCount);
+          this.addPlayerForms(newPlayerCount - currentPlayerCount);
         } else {
-          this.removePlayer(currentPlayerCount - newPlayerCount);
+          this.removePlayerForms(currentPlayerCount - newPlayerCount);
         }
         return;
       }
@@ -98,75 +92,50 @@ export class GameSettings extends HTMLElement {
     throw new Error(
       "PlayerSettings ~ setPlayers: event.currentTarget is not an instance of HTMLSelectElement",
     );
-  }
+  };
 
-  addPlayer(amount: number) {
+  private addPlayerForms = (amount: number) => {
     if (amount > 0) {
-      let currentLastId = parseInt(this.data[this.data.length - 1]?.id);
-      const newData = [...this.data];
+      const newPlayerForms = [...this.#playerForms];
 
       for (let i = 0; i < amount; i++) {
-        const playerForm = document.createElement("player-form");
-
-        if (playerForm instanceof PlayerForm) {
-          currentLastId = isNaN(currentLastId) ? i : currentLastId + 1;
-          const player = defaultPlayers[currentLastId];
-          const { name, color, sound, keyup: keyUp, keydown: keyDown } = player;
-
-          playerForm.setAttribute("id", currentLastId.toLocaleString());
-          playerForm.setAttribute("name", name);
-          playerForm.setAttribute("color", color);
-          playerForm.setAttribute("sound", sound);
-          playerForm.setAttribute("keyup", keyUp);
-          playerForm.setAttribute("keydown", keyDown);
-          playerForm.addEventListener(CustomEventType.PlayerFormChange, this.onPlayerFormChange);
-          this.#formsContainerElement.appendChild(playerForm);
-
-          newData.push(playerForm);
-        } else {
-          throw new Error(
-            "PlayerSettings ~ addPlayer: playerForm is not an instance of PlayerForm",
-          );
-        }
+        const playerFormIndex = this.#playerForms.length + i;
+        const playerForm = new PlayerForm(playerFormIndex);
+        playerForm.addEventListener(CustomEventType.PlayerFormChange, this.onPlayerFormChange);
+        this.#playerFormsContainer.appendChild(playerForm);
+        newPlayerForms.push(playerForm);
       }
-      this.data = newData;
+      this.playerForms = newPlayerForms;
     }
-  }
+  };
 
-  removePlayer(amount: number) {
+  private removePlayerForms = (amount: number) => {
     if (amount > 0) {
-      const newData = this.data.slice(0, -amount);
-      const formsToRemove = this.#data.splice(-amount);
+      const newPlayerForms = this.#playerForms.slice(0, -amount);
+      const formsToRemove = this.#playerForms.splice(-amount);
       formsToRemove.forEach((playerForm) => {
         playerForm.removeEventListener(CustomEventType.PlayerFormChange, this.onPlayerFormChange);
         playerForm.remove();
       });
-      this.data = newData;
+      this.playerForms = newPlayerForms;
     }
-  }
+  };
 
-  onPlayerFormChange(event: Event) {
+  private onPlayerFormChange = (event: Event) => {
     if (isPlayerFormChangeEvent(event)) {
       // TODO Why is this needed?
       event.stopImmediatePropagation();
-      const changes = event.detail;
-      const newData = [...this.data];
-      const playerData = newData.find((playerData) => playerData.id === changes.previousId);
-
-      if (!playerData) {
-        newData.push(changes);
-      }
-      this.data = newData;
+      this.dispatchEvent(createCustomEvent(CustomEventType.GameSettingsChange, null));
     }
+  };
+
+  get playerForms() {
+    return this.#playerForms;
   }
 
-  get data() {
-    return this.#data;
-  }
-
-  set data(data) {
-    this.#data = data;
-    this.dispatchEvent(createCustomEvent(CustomEventType.GameSettingsChange, this.data));
+  set playerForms(playerForms) {
+    this.#playerForms = playerForms;
+    this.dispatchEvent(createCustomEvent(CustomEventType.GameSettingsChange, null));
   }
 }
 

@@ -5,19 +5,13 @@ export class KeybindForm extends HTMLElement {
   #buttonElement: HTMLInputElement;
   #dialogElement: HTMLDialogElement;
 
-  value: string = "";
-  title: string = "";
-  name: string = "";
+  value = "";
+  title = "";
+  name = "";
   static observedAttributes = ["value", "title", "name"];
 
   constructor() {
     super();
-
-    // Binding methods
-    this.showDialog = this.showDialog.bind(this);
-    this.onAttributeChanged = this.onAttributeChanged.bind(this);
-    this.onKeyUp = this.onKeyUp.bind(this);
-    this.changeKey = this.changeKey.bind(this);
 
     // Shadow DOM
     const shadow = this.attachShadow({ mode: "open" });
@@ -78,12 +72,12 @@ export class KeybindForm extends HTMLElement {
     }
   }
 
-  showDialog() {
+  showDialog = () => {
     this.#dialogElement.addEventListener("keyup", this.onKeyUp);
     this.#dialogElement.showModal();
-  }
+  };
 
-  onAttributeChanged(name: string, value: string) {
+  private onAttributeChanged = (name: string, value: string) => {
     switch (name) {
       case "title":
         this.title = value;
@@ -95,18 +89,16 @@ export class KeybindForm extends HTMLElement {
       case "value":
         this.changeKey(value);
         break;
-      default:
-        break;
     }
-  }
+  };
 
-  onKeyUp(event: KeyboardEvent) {
+  private onKeyUp = (event: KeyboardEvent) => {
     if (this.#dialogElement.open) {
       this.changeKey(event.key);
     }
-  }
+  };
 
-  changeKey(key: string) {
+  private changeKey = (key: string) => {
     if (key !== "Esc" && key !== "Escape") {
       this.value = key;
       this.#buttonElement.value = key;
@@ -114,7 +106,7 @@ export class KeybindForm extends HTMLElement {
     }
     this.#dialogElement.removeEventListener("keyup", this.onKeyUp);
     this.#dialogElement.close();
-  }
+  };
 }
 
 customElements.define("keybind-form", KeybindForm);

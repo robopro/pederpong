@@ -1,342 +1,178 @@
-/**
- * Keeps track of players
- * To do that it needs to keep track of the inputs
- *      => This guy handles creating the inputs and dealing with those
- *
- * Because this guy keeps track of players it makes sense he handles scores as well
- *
- * So. GameManager implements:
- *    PlayerManager
- *    Setting components (through another manager/component?)
- *    Score/ScoreboardManager
- *
- * Also keeps track of whether game is running or not.
- */
-
-import { Player, PlayerForm } from "../components/PlayerForm";
 import { GameSettings } from "../components/GameSettings";
-import { Scoreboard } from "../components/Scoreboard";
-import { CustomEventType, isGameSettingsChangeEvent } from "../types";
+import { ScoreboardContainer } from "../components/ScoreboardContainer";
+import {
+  CustomEventType,
+  GameState,
+  isGameSettingsChangeEvent,
+  Position,
+  positions,
+} from "../types";
 import { LoadingDialog } from "../components/LoadingDialog";
 import { Confetti } from "../components/Confetti";
 import {
   canvasDimension,
-  gridSize,
   maxPlayers,
-  defaultPaddleDepth,
-  defaultPaddleLength,
-  defaultPaddleSpeed,
-  defaultPlayers,
   createDefaultPlayer,
-  defaultBallSpeed,
-  defaultBallSize,
-  defaultBallPosition,
+  isCollision,
+  solveBallBallCollision,
+  solveBallPaddleCollision,
+  winningScore,
   getRandomNumber,
-} from "../variables";
-
-const paddlesPositions = ["top", "right", "bottom", "left"] as const;
-
-type PaddlePosition = (typeof paddlesPositions)[number];
-// enum PaddlePosition {
-//   Top,
-//   Right,
-//   Bottom,
-//   Left,
-// }
-
-// interface Paddle {
-//   playerId: string;
-//   color: string;
-//   position: PaddlePosition;
-//   speed: number;
-//   width: number;
-//   height: number;
-//   x: number;
-//   y: number;
-//   dx: number;
-//   dy: number;
-//   colliding: boolean;
-// }
-
-class Paddle {
-  #player: PlayerForm;
-  position: PaddlePosition;
-  vx: number;
-  vy: number;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-  dx: number = 0;
-  dy: number = 0;
-  colliding: boolean = false;
-
-  constructor(player: PlayerForm, position: PaddlePosition) {
-    this.#player = player;
-    this.position = position;
-
-    this.width =
-      position === "top" || position === "bottom" ? defaultPaddleLength : defaultPaddleDepth;
-    this.height =
-      position === "top" || position === "bottom" ? defaultPaddleDepth : defaultPaddleLength;
-
-    switch (position) {
-      case "top":
-        this.width = defaultPaddleLength;
-        this.height = defaultPaddleDepth;
-        this.x = canvasDimension / 2 - this.width / 2;
-        this.y = gridSize;
-        this.vx = defaultPaddleSpeed;
-        this.vy = 0;
-        break;
-      case "right":
-        this.width = defaultPaddleDepth;
-        this.height = defaultPaddleLength;
-        this.x = canvasDimension - gridSize - this.width;
-        this.y = canvasDimension / 2 - this.height / 2;
-        this.vx = 0;
-        this.vy = defaultPaddleSpeed;
-        break;
-      case "bottom":
-        this.width = defaultPaddleLength;
-        this.height = defaultPaddleDepth;
-        this.x = canvasDimension / 2 - this.width / 2;
-        this.y = canvasDimension - gridSize - this.height;
-        this.vx = defaultPaddleSpeed;
-        this.vy = 0;
-        break;
-      // Intentional overload
-      case "left":
-      default:
-        this.width = defaultPaddleDepth;
-        this.height = defaultPaddleLength;
-        this.x = gridSize;
-        this.y = canvasDimension / 2 - this.height / 2;
-        this.vx = 0;
-        this.vy = defaultPaddleSpeed;
-        break;
-    }
-
-    this.onKeyDown = this.onKeyDown.bind(this);
-    this.onKeyUp = this.onKeyUp.bind(this);
-
-    document.addEventListener("keydown", this.onKeyDown);
-    document.addEventListener("keyup", this.onKeyUp);
-  }
-
-  onKeyDown(event: KeyboardEvent) {
-    const { keyup, keydown } = this.#player;
-    if (event.key === keyup) {
-      event.preventDefault();
-      this.dx = this.vx;
-      this.dy = -this.vy;
-    } else if (event.key === keydown) {
-      event.preventDefault();
-      this.dx = -this.vx;
-      this.dy = this.vy;
-    }
-  }
-
-  onKeyUp(event: KeyboardEvent) {
-    const { keyup, keydown } = this.#player;
-    if (event.key === keyup || event.key === keydown) {
-      event.preventDefault();
-      this.dx = 0;
-      this.dy = 0;
-    }
-  }
-
-  move() {
-    this.x += this.dx;
-    this.y += this.dy;
-
-    if (this.x < 0) {
-      this.x = 0;
-    } else if (this.x + this.width > canvasDimension) {
-      this.x = canvasDimension - this.width;
-    } else if (this.y < 0) {
-      this.y = 0;
-    } else if (this.y + this.height > canvasDimension) {
-      this.y = canvasDimension - this.height;
-    }
-  }
-
-  draw(context: CanvasRenderingContext2D) {
-    context.fillStyle = this.#player.getColor();
-    context.fillRect(this.x, this.y, this.width, this.height);
-  }
-
-  remove() {
-    document.removeEventListener("keydown", this.onKeyDown);
-    document.removeEventListener("keyup", this.onKeyUp);
-  }
-}
-
-class Ball {
-  #player: PlayerForm;
-  #avatar: HTMLImageElement;
-  speed: number = defaultBallSpeed;
-  width: number = defaultBallSize;
-  height: number = defaultBallSize;
-  x: number = defaultBallPosition;
-  y: number = defaultBallPosition;
-  dx: number = 0;
-  dy: number = 0;
-  colliding: boolean = false;
-
-  constructor(player: PlayerForm) {
-    this.#player = player;
-
-    const avatar = new Image(defaultBallSize - 5, defaultBallSize - 5);
-    avatar.src = "./src/images/avatar.png";
-    this.#avatar = avatar;
-
-    this.reset();
-  }
-
-  reset() {
-    this.x = defaultBallPosition;
-    this.y = defaultBallPosition;
-    this.dx = 0;
-    this.dy = 0;
-
-    window.setTimeout(() => {
-      const angle = getRandomNumber(0, 360);
-      this.dx = this.speed * Math.cos(angle);
-      this.dy = this.speed * Math.sin(angle);
-    }, 1000);
-  }
-
-  move() {
-    this.x += this.dx;
-    this.y += this.dy;
-  }
-
-  // return null or the position it went past
-  // can use that information to find the paddle
-  // and through the paddle the player
-  // then if ball and paddle belong to same player => negative score
-  // else positive score
-  isOutOfBounds() {
-    return (
-      this.x - this.width < 0 ||
-      this.x > canvasDimension ||
-      this.y - this.height < 0 ||
-      this.y > canvasDimension
-    );
-  }
-
-  draw(context: CanvasRenderingContext2D) {
-    console.log("what");
-    context.fillStyle = this.#player.getColor();
-    context.fillRect(this.x - 5, this.y - 5, this.width + 10, this.height + 10);
-    context.drawImage(this.#avatar, this.x, this.y, this.width, this.height);
-  }
-}
-
-enum GameState {
-  Initializing,
-  Ready,
-  Running,
-  Winner,
-}
+  startGameKey,
+  frameRate,
+} from "../utils";
+import { Player } from "../classes/Player";
+import { Paddle } from "../classes/Paddle";
+import { Ball } from "../classes/Ball";
+import { PlayerScoreboard } from "../components/PlayerScoreboard";
 
 interface GameManagerProps {
   gameSettings: GameSettings;
-  scoreboard: Scoreboard;
+  scoreboardContainer: ScoreboardContainer;
   loadingDialog: LoadingDialog;
   confetti: Confetti;
-  context: CanvasRenderingContext2D;
+  canvas: HTMLCanvasElement;
 }
 
 export class GameManager {
   #gameSettings: GameSettings;
-  #scoreboard: Scoreboard;
+  #scoreboardContainer: ScoreboardContainer;
+  #playerScoreboards: PlayerScoreboard[] = [];
+  #canvas: HTMLCanvasElement;
+  #context: CanvasRenderingContext2D;
   #loadingDialog: LoadingDialog;
   #confetti: Confetti;
-  #context: CanvasRenderingContext2D;
 
-  #gameState: GameState;
-  #winner: PlayerForm | null = null;
-  #players: PlayerForm[];
-
+  #gameState = GameState.Initializing;
+  #winners: Player[] = [];
+  #players: Player[] = [];
   #paddles: Paddle[] = [];
   #balls: Ball[] = [];
-  // score: Score[];
+  #lastRenderTime = Date.now();
 
-  constructor({ gameSettings, scoreboard, loadingDialog, confetti, context }: GameManagerProps) {
-    // this.#gameState = GameState.Initializing;
-
+  constructor({
+    gameSettings,
+    scoreboardContainer,
+    loadingDialog,
+    confetti,
+    canvas,
+  }: GameManagerProps) {
     // Initialize properties
     this.#gameSettings = gameSettings;
-    this.#scoreboard = scoreboard;
+    this.#scoreboardContainer = scoreboardContainer;
     this.#loadingDialog = loadingDialog;
     this.#confetti = confetti;
-    this.#context = context;
+    this.#canvas = canvas;
 
-    // Binding functions
-    this.initializeGame = this.initializeGame.bind(this);
-    this.createPaddles = this.createPaddles.bind(this);
-    this.onSettingsChange = this.onSettingsChange.bind(this);
-    this.update = this.update.bind(this);
+    const context = canvas.getContext("2d");
+    if (context) {
+      this.#context = context;
+      this.#context.font = "bold xx-large monospace";
+      this.#context.textAlign = "center";
+    } else {
+      throw new Error("GameManager - constructor: No context found for canvas");
+    }
 
     // Add event listeners
-    gameSettings.addEventListener(CustomEventType.GameSettingsChange, this.onSettingsChange);
-    // this.#players = gameSettings.data;
-    // this.paddles = [];
-    // this.balls = [];
-    // this.score = [];
-
-    // Initialize game
-    this.initializeGame(gameSettings.data);
+    this.#gameSettings.addEventListener(CustomEventType.GameSettingsChange, this.onSettingsChange);
   }
 
-  // The async-ness and the loading dialog are a joke, btw
-  async initializeGame(players: PlayerForm[]) {
-    this.#loadingDialog.show();
+  private onSettingsChange = (event: Event) => {
+    if (isGameSettingsChangeEvent(event)) {
+      this.initializeGame();
+    }
+  };
+
+  // Call this method to start the game!
+  // The async-ness is a joke, btw
+  initializeGame = async () => {
+    document.removeEventListener("keyup", this.setGameStateRunning);
+    document.removeEventListener("keyup", this.restart);
     this.#gameState = GameState.Initializing;
-    this.#winner = null;
-    this.#players = players;
-    this.#scoreboard.setScores(players);
+    this.#loadingDialog.show();
+    this.#confetti.stop();
+    Ball.usedStartingPositions = new Set();
+    this.#winners = [];
+
+    this.resetCanvasRotation();
+    this.createPlayers();
+    this.createPlayerScoreboards();
     this.createPaddles();
     this.createBalls();
-    this.#confetti.stop();
+    // This is also a joke
+    this.loading();
+  };
 
+  private loading = () => {
     window.setTimeout(() => {
-      this.#gameState = GameState.Ready;
+      this.setGameStateReady();
       this.#loadingDialog.close();
       this.start();
     }, 1000);
-  }
+  };
 
-  async onSettingsChange(event: Event) {
-    if (isGameSettingsChangeEvent(event)) {
-      this.initializeGame(event.detail);
+  private createPlayers = () => {
+    this.#players = [];
+
+    const playerFormData = this.#gameSettings.playerForms.map((playerForm) =>
+      playerForm.getFormData(),
+    );
+    for (let i = 0; i < playerFormData.length; i++) {
+      const formData = playerFormData[i];
+      if (formData) {
+        const player = new Player(formData);
+        if (i >= maxPlayers) {
+          player.canWin = false;
+        }
+        this.#players.push(player);
+      }
     }
-  }
+  };
 
-  handlePlayerSettingsChanged() {
-    // stop game
-    // update this.players
-  }
+  private createPlayerScoreboards = () => {
+    this.#scoreboardContainer.removePlayerScoreboards();
+    this.#playerScoreboards = [];
 
-  createPaddles() {
-    const playerCount = this.#players.length;
-    const paddles: Paddle[] = [];
+    for (const player of this.#players) {
+      const playerScoreboard = new PlayerScoreboard({
+        playerId: player.id.toLocaleString(),
+        name: player.name,
+        color: player.color,
+        score: player.score.toLocaleString(),
+      });
+      this.#scoreboardContainer.addPlayerScoreboard(playerScoreboard);
+      this.#playerScoreboards.push(playerScoreboard);
+    }
+  };
 
+  private updatePlayerScoreboards = () => {
+    for (const playerScoreboard of this.#playerScoreboards) {
+      const player = this.#players.find(
+        (player) => player.id.toLocaleString() === playerScoreboard.playerid,
+      );
+      if (player) {
+        playerScoreboard.setPlayerScoreboardData({ score: player.score.toLocaleString() });
+      }
+    }
+  };
+
+  private createPaddles = () => {
     this.#paddles.forEach((paddle) => {
-      paddle.remove();
+      paddle.delete();
     });
+    this.#paddles = [];
+
+    const playerCount = this.#players.length > maxPlayers ? maxPlayers : this.#players.length;
 
     for (let i = 0; i < maxPlayers; i++) {
       // Circle around players array when less than four players
       const playerIndex = ((i % playerCount) + playerCount) % playerCount;
       // playerIndex is NaN when players.length === 0
-      const player = isNaN(playerIndex) ? createDefaultPlayer(0) : this.#players[playerIndex];
-      const position = paddlesPositions[i];
+      const player = isNaN(playerIndex) ? createDefaultPlayer(i) : this.#players[playerIndex];
+      const position = positions[i];
       if (position) {
         if (player) {
-          paddles.push(new Paddle(player, position));
+          this.#paddles.push(new Paddle(player, position));
         } else {
           throw new Error(`GameManager ~ createPaddles: No player found at index ${playerIndex}`);
         }
@@ -344,128 +180,199 @@ export class GameManager {
         throw new Error(`GameManager ~ createPaddles: No paddle found for index ${i}`);
       }
     }
-    this.#paddles = paddles;
-  }
+  };
 
-  createBalls() {
-    const balls: Ball[] = [];
+  private createBalls = () => {
+    this.#balls = [];
 
     if (this.#players.length === 0) {
       for (let i = 0; i < maxPlayers; i++) {
-        balls.push(new Ball(createDefaultPlayer(0)));
+        this.#balls.push(new Ball(createDefaultPlayer(i)));
       }
     } else {
-      this.#players.forEach((player) => {
-        balls.push(new Ball(player));
-      });
+      const playerCount = this.#players.length > maxPlayers ? maxPlayers : this.#players.length;
+      for (let i = 0; i < playerCount; i++) {
+        const player = this.#players[i];
+        if (player) {
+          this.#balls.push(new Ball(player));
+        }
+      }
     }
+  };
 
-    this.#balls = balls;
-  }
+  private setGameStateReady = () => {
+    document.addEventListener("keyup", this.setGameStateRunning);
+    this.#gameState = GameState.Ready;
+  };
 
-  checkCollision() {}
-  handleCollision() {}
+  private setGameStateRunning = (event: KeyboardEvent) => {
+    if (event.key === startGameKey) {
+      document.removeEventListener("keyup", this.setGameStateRunning);
+      this.#gameState = GameState.Running;
+    }
+  };
 
-  checkGoal() {
-    // ball out of bounds
-  }
-  updateScore() {
-    //
-  }
-  handleWinner(player: PlayerForm) {
-    this.#winner = player;
+  private setGameStateWinner = () => {
     this.#confetti.start();
     this.#gameState = GameState.Winner;
-  }
+    document.addEventListener("keyup", this.restart);
+  };
 
-  start() {
-    requestAnimationFrame(this.update);
-    // change game state
-    // more?
-  }
+  private move = () => {
+    this.#paddles.forEach((paddle) => {
+      paddle.move();
+    });
 
-  stop() {
-    // change game state
-    // more?
-  }
+    this.#balls.forEach((ball) => {
+      ball.move();
+    });
+  };
 
-  update() {
-    this.#context.clearRect(0, 0, canvasDimension, canvasDimension);
-    if (this.#gameState === GameState.Initializing) {
-      return;
+  private checkGoals = () => {
+    for (const ball of this.#balls) {
+      const goalPosition = ball.isOutOfBounds();
+      if (goalPosition) {
+        this.updatePlayerScores(ball, goalPosition);
+        this.updatePlayerScoreboards();
+        ball.reset();
+      }
     }
-    if (this.#gameState === GameState.Ready) {
-      // display Press Space To Start
-      // listen for Press Space To Start
-      // Add and remove event listeners on GameState.Ready change?
-      this.#paddles.forEach((paddle) => {
-        paddle.move();
-        paddle.draw(this.#context);
-      });
+  };
 
-      this.#balls.forEach((ball) => {
-        ball.move();
-        if (ball.isOutOfBounds()) {
-          ball.reset();
+  private updatePlayerScores = (ball: Ball, goalPosition: Position) => {
+    const paddle = this.#paddles.find((paddle) => paddle.position === goalPosition);
+    const paddlePlayerId = paddle?.player.id;
+    const ballPlayerId = ball.player.id;
+    const isOwnGoal = paddlePlayerId === ballPlayerId;
+
+    for (const player of this.#players) {
+      if (player.canWin) {
+        if (isOwnGoal && player.id === ballPlayerId) {
+          player.addScore(-ball.pointValue);
+        } else if (player.id !== paddlePlayerId) {
+          player.addScore(ball.pointValue);
         }
-        ball.draw(this.#context);
-      });
+      }
     }
-    if (this.#gameState === GameState.Winner) {
-      // Display winner dialog and release confetti
-      // Press Space To Play Again => No. Press Space To Continue => Reset game state and initialize
-      // No dialog? Just text on screen. That way we can simply listen for gameSettingsChange event
+  };
+
+  private checkWinners = () => {
+    for (const player of this.#players) {
+      if (player.score >= winningScore) {
+        this.#winners.push(player);
+      }
     }
-    if (this.#gameState === GameState.Running) {
-      // update movement
-      // check collisions
-      // check goals
-      // check winner
+    if (this.#winners.length > 0) {
+      this.setGameStateWinner();
+    }
+  };
+
+  private checkCollision = () => {
+    for (const ballA of this.#balls) {
+      for (const ballB of this.#balls) {
+        if (ballA.id !== ballB.id && isCollision(ballA, ballB)) {
+          solveBallBallCollision(ballA, ballB);
+        }
+      }
+
+      for (const paddle of this.#paddles) {
+        if (isCollision(ballA, paddle)) {
+          solveBallPaddleCollision(ballA, paddle);
+          ballA.player.playAudio();
+          this.rotateCanvasRandomly();
+        }
+      }
+    }
+  };
+
+  private resetCanvasRotation = () => {
+    this.#canvas.style.transform = "rotate(0deg)";
+  };
+
+  private rotateCanvasRandomly = () => {
+    const rotateAngle = `${getRandomNumber(-360, 360)}deg`;
+    const rotate3dAngle = `${getRandomNumber(15, 45)}deg`;
+    const { x, y, z } = { x: Math.random(), y: Math.random(), z: Math.random() };
+    const transform = `rotate(${rotateAngle}) rotate3d(${x}, ${y}, ${z}, ${rotate3dAngle})`;
+    this.#canvas.style.transform = transform;
+  };
+
+  private draw = () => {
+    for (const paddle of this.#paddles) {
+      paddle.draw(this.#context);
+    }
+    for (const ball of this.#balls) {
+      ball.draw(this.#context);
+    }
+  };
+
+  private start = () => {
+    requestAnimationFrame(this.update);
+  };
+
+  private restart = (event: KeyboardEvent) => {
+    if (event.key === startGameKey) {
+      document.removeEventListener("keyup", this.restart);
+      this.#winners = [];
+      this.#confetti.stop();
+      this.resetCanvasRotation();
+
+      for (const player of this.#players) {
+        player.reset();
+      }
+      this.updatePlayerScoreboards();
+
+      for (const ball of this.#balls) {
+        ball.reset();
+      }
+      this.setGameStateReady();
+    }
+  };
+
+  private update = () => {
+    const elapsed = Date.now() - this.#lastRenderTime;
+    if (elapsed > frameRate) {
+      this.#context.clearRect(0, 0, canvasDimension, canvasDimension);
+      if (this.#gameState === GameState.Stopped) {
+        return;
+      }
+      if (this.#gameState === GameState.Ready) {
+        this.drawStartScreen();
+      }
+      if (this.#gameState === GameState.Winner) {
+        this.drawWinners();
+      }
+      if (this.#gameState === GameState.Running) {
+        this.move();
+        this.checkGoals();
+        this.checkWinners();
+        this.checkCollision();
+        this.draw();
+      }
     }
     requestAnimationFrame(this.update);
-  }
+  };
+
+  private drawStartScreen = () => {
+    const text = "Press SPACE to start";
+    this.#context.fillStyle = Math.random() < 0.5 ? "white" : "transparent";
+    this.#context.fillText(text, canvasDimension / 2, 100);
+  };
+
+  private drawWinners = () => {
+    const textHeight = this.#context.measureText("M").width + 20;
+
+    this.#winners.forEach((winner, index) => {
+      const text = `${winner.name} wins!`;
+      this.#context.fillStyle = winner.getColor();
+      this.#context.fillText(text, canvasDimension / 2, 100 + textHeight * index);
+    });
+    const text = "Press SPACE to play again";
+    this.#context.fillStyle = Math.random() < 0.5 ? "white" : "transparent";
+    this.#context.fillText(
+      text,
+      canvasDimension / 2,
+      100 + textHeight + textHeight * this.#winners.length,
+    );
+  };
 }
-
-function checkCollision(a: Ball, b: Ball | Paddle) {
-  return !(
-    a.x + a.width < b.x ||
-    b.x + b.width < a.x ||
-    a.y + a.height < b.y ||
-    b.y + b.height < a.y
-  );
-}
-
-function collides(a: Ball, b: Ball | Paddle) {
-  if (checkCollision(a, b)) {
-    // Will this prevent multiple collisions at once?
-    a.colliding = true;
-    b.colliding = true;
-
-    // Distance between
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-
-    // Solve collision
-    a.x += dx;
-    a.y += dy;
-
-    // Change vectors
-    const angle = Math.atan2(dy, dx);
-    a.dx -= Math.cos(angle);
-    a.dy -= Math.sin(angle);
-
-    // if (b instanceof Ball) {
-    //   b.dx += Math.cos(angle);
-    //   b.dy += Math.sin(angle);
-    // }
-  }
-}
-
-// NEXT STEP
-// Collision with paddle
-// Rotate board on collision
-// Play sound
-
-// Then set scores when ball is out of bounds
-
-// Then set winner

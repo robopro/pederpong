@@ -1,15 +1,10 @@
-import { getRandomInt, getRandomNumber } from "../variables";
+import { confettiColors, getRandomInt, getRandomNumber } from "../utils";
 
 export class Confetti extends HTMLElement {
   #confettiContainer: HTMLDivElement;
 
   constructor() {
     super();
-
-    // Binding methods
-    this.start = this.start.bind(this);
-    this.stop = this.stop.bind(this);
-    this.createConfettiPiece = this.createConfettiPiece.bind(this);
 
     // Build HTML
     const confetti = document.createElement("div");
@@ -56,17 +51,17 @@ export class Confetti extends HTMLElement {
     shadow.appendChild(confetti);
   }
 
-  start() {
+  start = () => {
     for (let i = 0; i < 150; i++) {
       this.createConfettiPiece();
     }
-  }
+  };
 
-  stop() {
+  stop = () => {
     this.#confettiContainer.innerHTML = "";
-  }
+  };
 
-  createConfettiPiece() {
+  private createConfettiPiece = () => {
     const confettiPiece = document.createElement("div");
     confettiPiece.classList.add("confetti-piece");
     confettiPiece.style.left = `${Math.random() * 100}%`;
@@ -78,12 +73,12 @@ export class Confetti extends HTMLElement {
     confettiPiece.style.setProperty("--rotation-end", `${getRandomInt(270, 360)}deg`);
 
     this.#confettiContainer.appendChild(confettiPiece);
-  }
+  };
 
-  getConfettiColor() {
-    const colors = ["#ff6347", "#ffa500", "#32cd32", "#1e90ff", "#ff69b4"];
-    return colors[Math.floor(Math.random() * colors.length)];
-  }
+  private getConfettiColor = () => {
+    const index = Math.floor(Math.random() * confettiColors.length);
+    return confettiColors[index] ?? confettiColors[0];
+  };
 }
 
 customElements.define("confetti-tag", Confetti);

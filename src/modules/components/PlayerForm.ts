@@ -1,48 +1,40 @@
-import { Color, createCustomEvent, CustomEventType, Sound } from "../types";
-import { defaultPlayers } from "../variables";
+import {
+  Color,
+  createCustomEvent,
+  CustomEventType,
+  isColor,
+  isSound,
+  PlayerFormData,
+  Sound,
+} from "../types";
+import { defaultPlayerFormData } from "../utils";
 import { KeybindForm } from "./KeybindForm";
 
-export interface Player {
-  id: string;
-  name: string;
-  color: string;
-  sound: string;
-  keyup: string;
-  keydown: string;
-}
-
 export class PlayerForm extends HTMLElement {
-  #previousId: string | undefined;
-  #nameElement: HTMLInputElement;
-  #colorElement: HTMLSelectElement;
-  #soundElement: HTMLSelectElement;
-  #keyUpElement: KeybindForm;
-  #keyDownElement: KeybindForm;
-  #audioElement: HTMLAudioElement;
+  #nameInput: HTMLInputElement;
+  #colorInput: HTMLSelectElement;
+  #soundInput: HTMLSelectElement;
+  #keyUpInput: KeybindForm;
+  #keyDownInput: KeybindForm;
 
   name: string;
-  color: string;
-  sound: string;
+  color: Color;
+  sound: Sound;
   keyup: string;
   keydown: string;
-  score: string = "0";
-  static observedAttributes = ["id", "name", "color", "sound", "keyup", "keydown", "score"];
+  static observedAttributes = ["name", "color", "sound", "keyup", "keydown"];
 
-  constructor() {
+  constructor(defaultPlayerIndex: number = 0) {
     super();
 
     // Initialize properties
-    const { name, color, sound, keyup, keydown } = defaultPlayers[0];
+    const { name, color, sound, keyup, keydown } =
+      defaultPlayerFormData[defaultPlayerIndex] ?? defaultPlayerFormData[0];
     this.name = name;
     this.color = color;
     this.sound = sound;
     this.keyup = keyup;
     this.keydown = keydown;
-    this.#audioElement = new Audio(`./src/sounds/${this.sound}.mp3`);
-
-    // Binding methods
-    this.onFormChange = this.onFormChange.bind(this);
-    this.handleFormChange = this.handleFormChange.bind(this);
 
     // Shadow DOM
     const shadow = this.attachShadow({ mode: "open" });
@@ -57,7 +49,7 @@ export class PlayerForm extends HTMLElement {
       .join();
 
     const soundOptions = Object.values(Sound)
-      .map((sound) => `<option value=${sound}>${sound}</option>`)
+      .map((sound) => `<option value=${sound}>${sound.split(".mp3").shift()}</option>`)
       .join();
 
     playerForm.innerHTML = `
@@ -103,101 +95,106 @@ export class PlayerForm extends HTMLElement {
       keyUpElement instanceof KeybindForm &&
       keyDownElement instanceof KeybindForm
     ) {
-      this.#nameElement = nameElement;
-      this.#colorElement = colorElement;
-      this.#soundElement = soundElement;
+      this.#nameInput = nameElement;
+      this.#colorInput = colorElement;
+      this.#soundInput = soundElement;
 
-      this.#keyUpElement = keyUpElement;
-      this.#keyUpElement.setAttribute("value", this.keyup);
+      this.#keyUpInput = keyUpElement;
+      this.#keyUpInput.setAttribute("value", this.keyup);
 
-      this.#keyDownElement = keyDownElement;
-      this.#keyDownElement.setAttribute("value", this.keydown);
+      this.#keyDownInput = keyDownElement;
+      this.#keyDownInput.setAttribute("value", this.keydown);
     } else {
       throw new Error("PlayerForm ~ constructor: Couldn't find internal elements");
     }
   }
 
   connectedCallback() {
-    this.#nameElement.addEventListener("change", this.onFormChange);
-    this.#colorElement.addEventListener("change", this.onFormChange);
-    this.#soundElement.addEventListener("change", this.onFormChange);
-    this.#keyUpElement.addEventListener(CustomEventType.KeybindChange, this.onFormChange);
-    this.#keyDownElement.addEventListener(CustomEventType.KeybindChange, this.onFormChange);
+    this.#nameInput.addEventListener("change", this.onFormChange);
+    this.#colorInput.addEventListener("change", this.onFormChange);
+    this.#soundInput.addEventListener("change", this.onFormChange);
+    this.#keyUpInput.addEventListener(CustomEventType.KeybindChange, this.onFormChange);
+    this.#keyDownInput.addEventListener(CustomEventType.KeybindChange, this.onFormChange);
   }
 
   disconnectedCallback() {
-    this.#nameElement.removeEventListener("change", this.onFormChange);
-    this.#colorElement.removeEventListener("change", this.onFormChange);
-    this.#soundElement.removeEventListener("change", this.onFormChange);
-    this.#keyUpElement.removeEventListener(CustomEventType.KeybindChange, this.onFormChange);
-    this.#keyDownElement.removeEventListener(CustomEventType.KeybindChange, this.onFormChange);
+    this.#nameInput.removeEventListener("change", this.onFormChange);
+    this.#colorInput.removeEventListener("change", this.onFormChange);
+    this.#soundInput.removeEventListener("change", this.onFormChange);
+    this.#keyUpInput.removeEventListener(CustomEventType.KeybindChange, this.onFormChange);
+    this.#keyDownInput.removeEventListener(CustomEventType.KeybindChange, this.onFormChange);
   }
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string) {
     if (newValue !== oldValue) {
-      this.handleFormChange(name, newValue);
+      this.handleChange(name, newValue);
     }
   }
 
-  onFormChange(event: Event) {
+  private onFormChange = (event: Event) => {
     const { currentTarget } = event;
-
     if (
       currentTarget instanceof HTMLSelectElement ||
       currentTarget instanceof HTMLInputElement ||
       currentTarget instanceof KeybindForm
     ) {
       const { name, value } = currentTarget;
-      this.handleFormChange(name, value);
+      this.handleChange(name, value);
     }
-  }
+  };
 
-  handleFormChange(name: string, value: string) {
-    this.#previousId = this.id;
+  private handleChange = (name: string, value: string) => {
     switch (name) {
-      case "id":
-        this.id = value;
-        break;
       case "name":
         this.name = value;
-        this.#nameElement.value = value;
+        this.#nameInput.value = value;
         break;
       case "color":
-        this.color = value;
-        this.#colorElement.value = value;
+        if (isColor(value)) {
+          this.color = value;
+          this.#colorInput.value = value;
+        }
         break;
       case "sound":
-        this.sound = value;
-        this.#soundElement.value = value;
-        this.#audioElement = new Audio(`./src/sounds/${this.sound}.mp3`);
+        if (isSound(value)) {
+          this.sound = value;
+          this.#soundInput.value = value;
+        }
         break;
       case "keyup":
         this.keyup = value;
-        this.#keyUpElement.setAttribute("value", value);
+        this.#keyUpInput.setAttribute("value", value);
         break;
       case "keydown":
         this.keydown = value;
-        this.#keyDownElement.setAttribute("value", value);
-        break;
-      case "score":
-        this.score = value;
-      default:
+        this.#keyDownInput.setAttribute("value", value);
         break;
     }
-    this.dispatchEvent(createCustomEvent(CustomEventType.PlayerFormChange, this));
-  }
+    this.dispatchEvent(createCustomEvent(CustomEventType.PlayerFormChange, null));
+  };
 
-  getColor() {
-    return Math.random() < 0.5 ? this.color : "black";
-  }
+  getFormData = (): PlayerFormData => {
+    return {
+      name: this.name,
+      color: this.color,
+      sound: this.sound,
+      keyup: this.keyup,
+      keydown: this.keydown,
+    };
+  };
 
-  play() {
-    this.#audioElement.play();
-  }
-
-  get previousId() {
-    return this.#previousId;
-  }
+  setFormData = ({ name, color, sound, keyup, keydown }: Required<PlayerFormData>) => {
+    this.name = name;
+    this.#nameInput.value = name;
+    this.color = color;
+    this.#colorInput.value = color;
+    this.sound = sound;
+    this.#soundInput.value = sound;
+    this.keyup = keyup;
+    this.#keyUpInput.setAttribute("value", keyup);
+    this.keydown = keydown;
+    this.#keyDownInput.setAttribute("value", keydown);
+  };
 }
 
 customElements.define("player-form", PlayerForm);
