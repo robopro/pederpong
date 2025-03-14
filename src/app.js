@@ -163,7 +163,7 @@
   // src/modules/utils.ts
   var confettiColors = ["#ff6347", "#ffa500", "#32cd32", "#1e90ff", "#ff69b4"];
   var baseAudioUrl = "src/audio/";
-  var frameRate = 1e3 / 10;
+  var frameRate = 1e3 / 60;
   var maxPlayers = 4;
   var canvasDimension = 800;
   var gridSize = 20;
@@ -171,9 +171,9 @@
   var startGameKey = " ";
   var defaultPaddleLength = gridSize * 4;
   var defaultPaddleDepth = gridSize;
-  var defaultPaddleSpeed = 7;
+  var defaultPaddleSpeed = 16;
   var defaultBallSize = gridSize;
-  var defaultBallSpeed = 2;
+  var defaultBallSpeed = 8;
   var defaultBallPosition = canvasDimension / 2 - defaultBallSize / 2;
   var defaultBallPointValue = 1;
   var defaultKeys = [
@@ -1246,8 +1246,10 @@
       }
     };
     update = () => {
-      const elapsed = Date.now() - this.#lastRenderTime;
-      if (elapsed > frameRate) {
+      const now = Date.now();
+      const deltaTime = now - this.#lastRenderTime;
+      if (deltaTime > frameRate) {
+        this.#lastRenderTime = now;
         this.#context.clearRect(0, 0, canvasDimension, canvasDimension);
         if (this.#gameState === 4 /* Stopped */) {
           return;

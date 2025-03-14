@@ -7,7 +7,7 @@ import { Color, Position, positions, PlayerFormData, Sound } from "./types";
 export const confettiColors = ["#ff6347", "#ffa500", "#32cd32", "#1e90ff", "#ff69b4"] as const;
 export const baseAudioUrl = "src/audio/";
 export const avatarUrl = "src/images/avatar.png";
-export const frameRate = 1000 / 10;
+export const frameRate = 1000 / 60;
 
 // Game State
 export const maxPlayers = 4;
@@ -19,11 +19,11 @@ export const startGameKey = " ";
 // Paddle
 export const defaultPaddleLength = gridSize * 4;
 export const defaultPaddleDepth = gridSize;
-export const defaultPaddleSpeed = 7;
+export const defaultPaddleSpeed = 16;
 
 // Ball
 export const defaultBallSize = gridSize;
-export const defaultBallSpeed = 2;
+export const defaultBallSpeed = 8;
 export const defaultBallPosition = canvasDimension / 2 - defaultBallSize / 2;
 export const defaultBallPointValue = 1;
 

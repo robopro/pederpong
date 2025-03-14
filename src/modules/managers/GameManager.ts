@@ -330,8 +330,10 @@ export class GameManager {
   };
 
   private update = () => {
-    const elapsed = Date.now() - this.#lastRenderTime;
-    if (elapsed > frameRate) {
+    const now = Date.now();
+    const deltaTime = now - this.#lastRenderTime;
+    if (deltaTime > frameRate) {
+      this.#lastRenderTime = now;
       this.#context.clearRect(0, 0, canvasDimension, canvasDimension);
       if (this.#gameState === GameState.Stopped) {
         return;

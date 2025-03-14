@@ -1,7 +1,8 @@
 {
   "scripts": {
-    "watch": "esbuild src/app.ts --outfile=src/app.js --bundle --watch",
-    "build": "esbuild src/app.ts --outfile=src/app.js --bundle"
+    "build": "esbuild src/app.ts --outfile=src/app.js --bundle",
+    "serve": "esbuild src/app.ts --outfile=src/app.js --bundle --watch --servedir=./",
+    "watch": "esbuild src/app.ts --outfile=src/app.js --bundle --watch"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
